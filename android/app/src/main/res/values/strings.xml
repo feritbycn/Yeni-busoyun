@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Luxury Bus Master 3D</string>
+    <string name="title_activity_main">Luxury Bus Master 3D</string>
+    <string name="package_name">com.luxurybus.master3d</string>
+    <string name="custom_url_scheme">com.luxurybus.master3d</string>
+</resources>

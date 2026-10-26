@@ -1,0 +1,17 @@
+node_modules/
+*.keystore
+*.jks
+*.p12
+.env
+.env.*
+local.properties
+android/app/release/
+*.log
+www/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/src/main/assets/public
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json

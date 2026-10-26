@@ -1,0 +1,7 @@
+{
+  "appId": "com.luxurybus.master3d",
+  "appName": "Luxury Bus Master 3D",
+  "webDir": "www",
+  "backgroundColor": "#0b1226",
+  "android": { "allowMixedContent": false }
+}

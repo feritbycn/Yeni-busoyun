@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1b3a">
+<title>Luxury Bus Master 3D</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+
+  <!-- Oyun içi HUD -->
+  <div id="hud" class="hidden">
+    <button id="btn-pause" class="icon-btn" aria-label="Duraklat">❚❚</button>
+    <div id="hud-mid">
+      <div id="lvl-title">Seviye 1</div>
+      <div id="lvl-sub"><span id="star-preview">★★★</span><span id="moves-left" class="hidden"></span></div>
+    </div>
+    <div class="pill" id="coin-pill">🪙 <b id="coin-count">0</b></div>
+  </div>
+  <div id="tip" class="hidden"></div>
+  <div id="tools" class="hidden">
+    <button id="tool-undo" class="tool"><span class="ico">↶</span><span class="lbl">Geri al</span><i class="badge" id="badge-undo">3</i></button>
+    <button id="tool-hint" class="tool"><span class="ico">💡</span><span class="lbl">İpucu</span><i class="badge" id="badge-hint">3</i></button>
+    <button id="tool-slot" class="tool"><span class="ico">🅿️</span><span class="lbl">+Park yeri</span><i class="badge" id="badge-slot">1</i></button>
+    <button id="tool-ad" class="tool"><span class="ico">📺</span><span class="lbl">Reklamla</span></button>
+    <button id="tool-restart" class="tool"><span class="ico">⟲</span><span class="lbl">Yeniden</span></button>
+  </div>
+  <div id="toast" class="hidden"></div>
+
+  <!-- Ana menü -->
+  <section id="screen-title" class="screen">
+    <div class="title-card">
+      <div class="logo-badge">🚌</div>
+      <h1>LUXURY<br>BUS MASTER <span>3D</span></h1>
+      <p class="tagline">Yolcuları doğru otobüse bindir, trafiği çöz.</p>
+      <div id="profile-line" class="profile"></div>
+      <button id="btn-play" class="btn primary big">Oyna</button>
+      <button id="btn-levels" class="btn">Seviyeler</button>
+      <div class="menu-grid">
+        <button class="btn" data-open="parking">🅿️ Otopark</button>
+        <button class="btn" data-open="garage">🚌 Garaj</button>
+        <button class="btn" data-open="quests">📋 Görevler<i class="dot hidden" id="dot-quests"></i></button>
+        <button class="btn" data-open="shop">⭐ Premium</button>
+        <button class="btn" data-open="profile">👤 Profil</button>
+        <button class="btn" id="btn-settings">⚙️ Ayarlar</button>
+      </div>
+      <p class="ver">v0.1 prototip</p>
+    </div>
+  </section>
+
+  <!-- Seviye haritası -->
+  <section id="screen-levels" class="screen hidden">
+    <header class="bar">
+      <button class="icon-btn back" data-back>‹</button>
+      <h2>Seviyeler</h2>
+      <div class="pill">🪙 <b class="coin-count">0</b></div>
+    </header>
+    <div id="level-grid" class="level-grid"></div>
+  </section>
+
+  <!-- Ayarlar -->
+  <section id="screen-settings" class="screen hidden">
+    <header class="bar">
+      <button class="icon-btn back" data-back>‹</button>
+      <h2>Ayarlar</h2>
+      <span></span>
+    </header>
+    <div class="settings-list">
+      <label class="row"><span>Ses</span><input type="checkbox" id="set-sound"></label>
+      <label class="row"><span>Titreşim</span><input type="checkbox" id="set-vibration"></label>
+      <div class="row"><span>Grafik kalitesi</span>
+        <div class="seg" id="set-quality"><button data-q="high">Yüksek</button><button data-q="low">Düşük</button></div>
+      </div>
+      <div class="row stats" id="profile-stats"></div>
+      <button id="btn-reset" class="btn danger">İlerlemeyi sıfırla</button>
+      <p class="note">Reklam ve ödeme sistemleri <b>TEST modundadır</b>: gerçek reklam gösterilmez, gerçek ödeme alınmaz. Ayrıntı: Premium ekranı.</p>
+    </div>
+  </section>
+
+  <!-- Duraklat -->
+  <div id="modal-pause" class="modal hidden"><div class="card">
+    <h3>Duraklatıldı</h3>
+    <button class="btn primary" id="pause-resume">Devam et</button>
+    <button class="btn" id="pause-restart">Seviyeyi yeniden başlat</button>
+    <button class="btn" id="pause-levels">Seviyeler</button>
+    <button class="btn" id="pause-menu">Ana menü</button>
+  </div></div>
+
+  <!-- Kazandın -->
+  <div id="modal-win" class="modal hidden"><div class="card win">
+    <h3>Seviye tamamlandı!</h3>
+    <div class="stars" id="win-stars"><i>★</i><i>★</i><i>★</i></div>
+    <div id="win-rewards" class="rewards"></div>
+    <button class="btn gold" id="win-double">📺 Ödülü 2× yap (test reklamı)</button>
+    <button class="btn primary" id="win-next">Sonraki seviye</button>
+    <button class="btn" id="win-retry">Tekrar oyna</button>
+    <button class="btn" id="win-levels">Seviyeler</button>
+  </div></div>
+
+  <!-- Kaybettin -->
+  <div id="modal-lose" class="modal hidden"><div class="card lose">
+    <h3>Seviye başarısız</h3>
+    <p id="lose-reason"></p>
+    <button class="btn gold" id="lose-moves">📺 +3 hamle (test reklamı)</button>
+    <button class="btn primary" id="lose-undo">Son hamleyi geri al</button>
+    <button class="btn" id="lose-retry">Tekrar dene</button>
+    <button class="btn" id="lose-levels">Seviyeler</button>
+  </div></div>
+
+  <!-- Genel panel: Otopark, Garaj, Görevler, Premium, Profil -->
+  <section id="panel" class="hidden">
+    <header class="bar">
+      <button class="icon-btn" id="panel-back" aria-label="Geri">‹</button>
+      <h2 id="panel-title"></h2>
+      <div class="pills"><span class="pill">🪙 <b class="coin-count">0</b></span><span class="pill">💎 <b class="crystal-count">0</b></span></div>
+    </header>
+    <div id="panel-body"></div>
+  </section>
+
+  <!-- Reklam sahnesi (TEST simülasyonu; gerçek reklam değildir) -->
+  <div id="modal-ad" class="modal hidden"><div class="card ad">
+    <div class="ad-tag">TEST REKLAMI · simülasyon</div>
+    <h3 id="ad-title">Reklam</h3>
+    <p id="ad-desc"></p>
+    <div class="ad-bar"><i id="ad-fill"></i></div>
+    <button class="btn primary" id="ad-done" disabled>Bekle…</button>
+    <button class="btn" id="ad-skip">Kapat (ödül yok)</button>
+  </div></div>
+
+  <!-- Reklamla yardım seçenekleri -->
+  <div id="modal-sheet" class="modal hidden"><div class="card">
+    <h3>Reklam izleyerek kazan</h3>
+    <p>İsteğe bağlıdır; izlemezsen oyun etkilenmez. Her ödül günlük ve seviye başına sınırlıdır.</p>
+    <div id="sheet-options" class="sheet-options"></div>
+    <button class="btn" id="sheet-close">Kapat</button>
+  </div></div>
+
+  <div id="webgl-error" class="hidden"><div class="card"><h3>3D gösterilemiyor</h3><p>Bu cihaz/tarayıcı WebGL desteklemiyor veya WebGL kapalı. Lütfen güncel bir tarayıcı deneyin.</p></div></div>
+</div>
+<script src="dist/bundle.js"></script>
+</body>
+</html>

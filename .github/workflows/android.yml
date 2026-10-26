@@ -1,0 +1,96 @@
+name: Android APK
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Bağımlılıklar
+        run: npm ci
+
+      - name: Seviyeleri üret (100 seviye, çözücüyle doğrulanır)
+        run: npm run levels
+
+      - name: Testler
+        run: npm test
+
+      - name: Web paketi + Capacitor senkronizasyonu
+        run: npm run android:sync
+
+      - name: İmza anahtarı hazırla
+        id: sign
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "mode=secrets" >> "$GITHUB_OUTPUT"
+          else
+            # Secrets yoksa bu çalıştırmaya özel GEÇİCİ bir test anahtarı üretilir (her koşuda farklıdır).
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/release.jks" -storepass lbm-temp-pass -keypass lbm-temp-pass \
+              -alias lbm -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=LuxuryBusMaster Temp, O=Test"
+            echo "KEYSTORE_PASSWORD=lbm-temp-pass" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=lbm" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=lbm-temp-pass" >> "$GITHUB_ENV"
+            echo "mode=temp" >> "$GITHUB_OUTPUT"
+          fi
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: APK (release + debug) ve AAB derle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease assembleDebug bundleRelease --no-daemon --stacktrace
+
+      - name: Çıktıları topla
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/app-release.apk out/LuxuryBusMaster3D-release.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk out/LuxuryBusMaster3D-debug.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab out/LuxuryBusMaster3D-release.aab
+          if [ "${{ steps.sign.outputs.mode }}" = "temp" ]; then
+            echo "Bu dosyalar geçici test anahtarıyla imzalandı. Play Store için KEYSTORE_BASE64/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD secrets ekleyin." > out/IMZA_NOTU.txt
+          fi
+          ls -l out
+
+      - name: APK ve AAB dosyalarını yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: LuxuryBusMaster3D-apk-aab
+          path: out/
+          if-no-files-found: error
+
+      - name: GitHub Release oluştur (yalnızca main dalı)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          prerelease: true
+          files: out/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
