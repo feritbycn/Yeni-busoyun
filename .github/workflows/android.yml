@@ -73,8 +73,7 @@ jobs:
           code=$?
           if [ $code -ne 0 ]; then
             # Hata özetini annotation olarak yaz (log indirilemese bile Actions arayüzünde/API'de görünür)
-            grep -nE "What went wrong|error:|FAILED|Caused by|Could not|not found|Unsupported" "$RUNNER_TEMP/gradle.log" | head -12 | while read -r l; do echo "::error::$(echo "$l" | cut -c1-400)"; done
-            tail -25 "$RUNNER_TEMP/gradle.log" | while read -r l; do echo "::warning::$(echo "$l" | cut -c1-300)"; done
+            { grep -A8 "What went wrong" "$RUNNER_TEMP/gradle.log"; grep -A6 "Caused by: java.lang.IllegalArgumentException" "$RUNNER_TEMP/gradle.log" | head -14; grep -m6 -n "com.android" "$RUNNER_TEMP/gradle.log"; } | while read -r l; do echo "::error::$(echo "$l" | cut -c1-300)"; done
           fi
           exit $code
 
