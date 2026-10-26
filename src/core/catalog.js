@@ -57,7 +57,7 @@ export const AD_LIMITS = {
     double_reward: { daily: 10, perRun: 1 },
     extra_move: { daily: 5, perRun: 1, moves: 3 },
     extra_hint: { daily: 5, perRun: 1 },
-    temp_slot: { daily: 5, perRun: 1 },
+    unlock_stop: { daily: 10, perRun: 3 },
     daily_coins: { daily: 3, perRun: 0, coins: 100 },
   },
   interstitial: { everyLevels: 4, minGapMs: 180000, minLevel: 6 },

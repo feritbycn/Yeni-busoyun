@@ -59,7 +59,7 @@ export class AdManager {
     if (placement === 'daily_coins') { out.coins += lim.coins; reward.coins = lim.coins; }
     if (placement === 'extra_move') reward.moves = lim.moves;
     if (placement === 'extra_hint') reward.hints = 1;
-    if (placement === 'temp_slot') reward.slots = 1;
+    if (placement === 'unlock_stop') reward.slots = 1;
     if (placement === 'double_reward') reward.double = true; // ödemeyi çağıran yapar (aynı run'a bir kez)
     return { ok: true, save: out, reward };
   }

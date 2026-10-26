@@ -15,6 +15,8 @@ export const DIRS = {
   E: [1, 0],
   W: [-1, 0],
 };
+/** Seviyedeki toplam durak (açık + reklamla açılabilir). Eski seviyelerde açık durak + 1. */
+export const stopsOf = (L) => Math.max(L.bay, L.stops ?? L.bay + 1);
 export const isHorizontal = (dir) => dir === 'E' || dir === 'W';
 
 export function busCells(b) {
@@ -245,6 +247,8 @@ export class Game {
   tap(id) {
     if (this.status !== 'playing') return { ok: false, reason: 'finished', events: [] };
     const c = canExit(this.L, this.st, id);
+    // Boş durak yoksa otobüs çıkamaz; bu bir hata/hamle sayılmaz (oyuncu cezalandırılmaz, uyarılır).
+    if (!c.ok && (c.reason === 'bay_full' || c.reason === 'gone')) return { ok: false, reason: c.reason, events: [], status: this.status };
     this.taps++;
     if (!c.ok) {
       this.mistakes++;
@@ -294,8 +298,12 @@ export class Game {
     return true;
   }
   grantHint() { this.bonusHints++; return true; }
+  /** Reklamla açılabilecek kalan kilitli durak sayısı. */
+  get lockedStops() { return Math.max(0, stopsOf(this.L) - this.st.cap); }
+  canUnlockStop() { return this.status !== 'won' && this.lockedStops > 0; }
+  /** Reklam izlenince bir kilitli durak açılır (kilitlenmiş 'lost' durumu da kurtarılabilir). */
   grantAdSlot() {
-    if (this.status !== 'playing' || this.adSlots >= 1) return false;
+    if (!this.canUnlockStop()) return false;
     this.st.cap++; this.adSlots++;
     this.status = statusOf(this.L, this.st, this.taps - this.bonusMoves);
     return true;

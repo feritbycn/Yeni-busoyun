@@ -4,13 +4,14 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import levelData from '../../data/levels.json';
-import { Game, prepare } from '../core/engine.js';
+import { Game, prepare, stopsOf } from '../core/engine.js';
 import { solve } from '../core/solver.js';
 import { COLORS } from '../core/colors.js';
 import { claimLevelResult, accountLevel } from '../core/economy.js';
 import { systemClock } from '../core/timeutil.js';
 import { Analytics } from '../core/analytics.js';
 import { adsLeft } from '../core/ads.js';
+import { AD_LIMITS } from '../core/catalog.js';
 import { createShowroom, THEME_LOOK } from './showroom.js';
 import { createMeta, reasonText } from './meta.js';
 import { loadSave, writeSave, clearSave } from '../core/save.js';
@@ -128,6 +129,24 @@ function disposeGroup(g) {
   scene.remove(g);
 }
 
+/** Kilitli durak rozeti: altın daire, oynat simgesi ve "AÇ" yazısı (reklamla açılır). */
+let lockTex = null;
+function lockBadge() {
+  if (!lockTex) {
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 160;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#ffcf4a'; c.strokeStyle = 'rgba(8,12,24,0.9)'; c.lineWidth = 6;
+    c.beginPath(); c.arc(64, 60, 48, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = '#2a1d00'; c.beginPath(); c.moveTo(48, 36); c.lineTo(48, 84); c.lineTo(88, 60); c.closePath(); c.fill();
+    c.font = '800 34px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.lineWidth = 7; c.strokeText('AÇ', 64, 134); c.fillStyle = '#ffffff'; c.fillText('AÇ', 64, 134);
+    lockTex = new THREE.CanvasTexture(cv); lockTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: lockTex, transparent: true, depthTest: false }));
+  sp.scale.set(0.8, 1.0, 1); sp.renderOrder = 6;
+  return sp;
+}
+
 function labelSprite(text, w = 1.5) {
   const cv = document.createElement('canvas');
   cv.width = 256; cv.height = 64;
@@ -159,7 +178,7 @@ function buildLevelScene(L) {
   disposeGroup(levelGroup);
   levelGroup = new THREE.Group();
   scene.add(levelGroup);
-  const maxCap = L.bay + (L.helpers.extraSlot || 0) + 1; // +1: reklamla açılan geçici yer
+  const maxCap = Math.max(stopsOf(L), L.bay + (L.helpers.extraSlot || 0)); // tüm duraklar görünür; kilitliler reklamla açılır
   const gridMat = new THREE.MeshStandardMaterial({ color: 0x3b414d, roughness: 0.85, metalness: 0.1 });
   const slab = new THREE.Mesh(new RoundedBoxGeometry(L.w + 0.7, 0.14, L.h + 0.7, 3, 0.06), gridMat);
   slab.position.y = -0.07; slab.receiveShadow = true;
@@ -171,7 +190,7 @@ function buildLevelScene(L) {
   const bayZ = L.h / 2 + 0.7 + 1.7;
   const waitZ = bayZ + 1.7 + 0.35 + 0.55;
   const queueZ = waitZ + 0.55 + 0.35 + 0.5;
-  view = { maxCap, bayZ, waitZ, queueZ, buses: {}, slotMats: [], bayOcc: new Map(), qFigs: [], wFigs: [], qHead: 0, qLabel: null };
+  view = { maxCap, bayZ, waitZ, queueZ, buses: {}, slotMats: [], stopPick: [], lockSprites: [], lockPlates: [], bayOcc: new Map(), qFigs: [], wFigs: [], qHead: 0, qLabel: null };
 
   // park alanı
   const bayW = maxCap * SLOT_W + 0.5;
@@ -187,7 +206,14 @@ function buildLevelScene(L) {
       m.position.set(sx + ox, 0.004, bayZ + oz); levelGroup.add(m);
     }
   }
-  const lb1 = labelSprite('PARK ALANI', 2.4); lb1.position.set(-bayW / 2 + 1.25, 0.3, bayZ - 1.85); levelGroup.add(lb1);
+  for (let i = 0; i < maxCap; i++) {
+    const pick = new THREE.Mesh(new THREE.BoxGeometry(SLOT_W - 0.1, 0.05, 3.0), new THREE.MeshBasicMaterial({ color: 0xff3b3b, transparent: true, opacity: 0 }));
+    pick.position.set(slotX(i), 0.03, bayZ); pick.userData.stopIndex = i; levelGroup.add(pick); view.stopPick.push(pick);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(SLOT_W - 0.1, 0.03, 3.1), new THREE.MeshBasicMaterial({ color: 0x050914, transparent: true, opacity: 0.6 }));
+    plate.position.set(slotX(i), 0.025, bayZ); plate.visible = false; levelGroup.add(plate); view.lockPlates.push(plate);
+    const lk = lockBadge(); lk.position.set(slotX(i), 0.6, bayZ); lk.visible = false; levelGroup.add(lk); view.lockSprites.push(lk);
+  }
+  const lb1 = labelSprite('DURAKLAR', 2.4); lb1.position.set(-bayW / 2 + 1.25, 0.3, bayZ - 1.85); levelGroup.add(lb1);
 
   // bekleme alanı
   const wW = L.wait * WAIT_W + 0.5;
@@ -273,13 +299,23 @@ function placeQueueFig(f, k, instant = true) {
   return p;
 }
 
+function updateStops() {
+  if (!view || !game) return;
+  view.slotMats.forEach((m, i) => { m.opacity = i < game.st.cap ? 0.75 : 0.18; });
+  view.lockSprites.forEach((sp, i) => { sp.visible = i >= game.st.cap; });
+  view.lockPlates.forEach((p, i) => { p.visible = i >= game.st.cap; });
+}
+function flashStops() {
+  view.stopPick.forEach((p, i) => { if (i < game.st.cap) tween(0.5, (k) => { p.material.opacity = 0.55 * Math.sin(Math.PI * k); }, ease.lin); });
+}
+
 function rebuildFromState() {
   killTweens();
   chain = Promise.resolve();
   const L = game.L, st = game.st;
   view.bayOcc.clear();
   // slot işaretleri
-  view.slotMats.forEach((m, i) => (m.opacity = i < st.cap ? 0.75 : 0.18));
+  updateStops();
   L.buses.forEach((b) => {
     const m = view.buses[b.id];
     m.scale.setScalar(1);
@@ -428,7 +464,11 @@ $('c').addEventListener('pointerdown', (ev) => {
   raycaster.setFromCamera(ndc, camera);
   const targets = Object.values(view.buses).filter((m) => m.visible && !m.userData.inBay);
   const hit = raycaster.intersectObjects(targets, true)[0];
-  if (!hit) return;
+  if (!hit) {
+    const sp = raycaster.intersectObjects(view.stopPick.filter((m) => m.userData.stopIndex >= game.st.cap), false)[0];
+    if (sp) openStopAd();
+    return;
+  }
   let o = hit.object;
   while (o && o.userData.busId === undefined) o = o.parent;
   if (o) doTap(o.userData.busId);
@@ -438,7 +478,10 @@ function doTap(id) {
   if (!game || game.status !== 'playing') return null;
   const res = game.tap(id);
   if (!res.ok) {
-    if (res.reason === 'blocked') {
+    if (res.reason === 'bay_full') {
+      sfx.bump(); vibrate(40); flashStops();
+      toast(game.canUnlockStop() ? 'Duraklar dolu! Bir otobüs dolup ayrılana kadar bekle ya da kilitli 📺 durağa dokunup reklamla durak aç.' : 'Duraklar dolu! Bir otobüs dolup ayrılana kadar bekle.', 3200);
+    } else if (res.reason === 'blocked') {
       sfx.bump(); vibrate(40);
       bumpBus(id);
       toast('Yolu kapalı! Önce önündeki otobüsü çıkar.');
@@ -469,7 +512,7 @@ function bumpBus(id) {
 // ------------------------------------------------------------------ bitiş akışı
 function afterMove() {
   if (!game) return;
-  const key = game.runId + ':' + game.status;
+  const key = game.runId + ':' + game.status + ':' + game.st.cap;
   if (game.status === 'playing' || handled === key) return;
   handled = key;
   if (game.status === 'won') showWin(); else showLose();
@@ -510,10 +553,11 @@ function showLose() {
   let why = 'Hareket edebilecek otobüs kalmadı.';
   if (L.moveLimit && game.movesLeft === 0) why = 'Hamle hakkın bitti.';
   else if (game.movesLeft === 0 && L.moveLimit) why = 'Hamle hakkın bitti.';
-  else if (st.bay.length >= st.cap) why = 'Park alanı doldu ve hiçbir otobüs ilerleyemiyor.';
+  else if (st.bay.length >= st.cap) why = 'Duraklar doldu ve hiçbir otobüs çıkamıyor.' + (game.canUnlockStop() ? ' Reklam izleyerek yeni durak açabilirsin.' : '');
   $('lose-reason').textContent = why;
   analytics.track('level_lost', { level: L.id });
   $('lose-moves').classList.toggle('hidden', !(L.moveLimit && game.movesLeft === 0));
+  $('lose-stop').classList.toggle('hidden', !(game.canUnlockStop() && !(L.moveLimit && game.movesLeft === 0)));
   $('lose-undo').disabled = !game.canUndo();
   $('lose-undo').textContent = game.canUndo() ? `Son hamleyi geri al (${L.helpers.undo - game.undosUsed})` : 'Geri alma hakkı kalmadı';
   setTimeout(() => $('modal-lose').classList.remove('hidden'), 350);
@@ -530,6 +574,7 @@ function toast(msg, ms = 1800) {
 }
 function hideTip() { $('tip').classList.add('hidden'); }
 const TIPS = {
+  5: 'Duraklar dolarsa otobüs çıkamaz (hata sayılmaz). Kilitli 📺 durağa dokunursan reklam izleyerek yeni durak açarsın; isteğe bağlıdır, tüm seviyeler reklamsız çözülebilir.',
   1: 'Yolu açık olan bir otobüse dokun: okun gösterdiği yöne gidip ızgaradan çıkar.',
   2: 'Alttaki yolcular aynı renk ve simgeli otobüse biner. Park alanına giren otobüs yolcuları bekler.',
   3: 'Bir otobüsün yolunu başkası kapatıyorsa önce onu çıkar. Kapalı yola dokunmak hata sayılır.',
@@ -563,6 +608,7 @@ function updateHud() {
   $('tool-undo').disabled = !game.canUndo();
   $('tool-hint').disabled = !game.canHint();
   $('tool-slot').disabled = !game.canAddSlot();
+  $('tool-slot').classList.toggle('hidden', !h.extraSlot);
   refreshCoins();
 }
 
@@ -670,23 +716,24 @@ $('lose-moves').addEventListener('click', async () => {
   handled = null; closeModals(); updateHud();
 });
 function applyAdReward(placement, reward) {
-  game.adCounts[placement] = 1;
+  game.adCounts[placement] = (game.adCounts[placement] || 0) + 1;
   if (placement === 'extra_hint') game.grantHint();
-  else if (placement === 'temp_slot') { game.grantAdSlot(); view.slotMats.forEach((m, i) => (m.opacity = i < game.st.cap ? 0.75 : 0.18)); }
+  else if (placement === 'unlock_stop') { game.grantAdSlot(); updateStops(); toast('Yeni durak açıldı'); }
   else if (placement === 'extra_move') game.grantMoves(reward.moves);
   updateHud();
 }
 function openAdSheet() {
   if (!game || game.status !== 'playing') return;
   const L = game.L, box = $('sheet-options');
-  const opts = [['extra_hint', '💡 +1 ipucu'], ['temp_slot', '🅿️ +1 geçici park yeri (3★ vermez)']];
+  const opts = [['extra_hint', '💡 +1 ipucu'], ['unlock_stop', '🅿️ Yeni durak aç (3★ vermez)']];
   if (L.moveLimit) opts.push(['extra_move', '👣 +3 hamle']);
   box.innerHTML = '';
   opts.forEach(([pl, label]) => {
     const left = adsLeft(save, clockNow(), pl), used = game.adCounts[pl] || 0;
     const b = document.createElement('button');
     b.className = 'btn gold'; b.textContent = `${label} · bugün ${left} hak`;
-    b.disabled = left <= 0 || used >= 1 || (pl === 'temp_slot' && game.adSlots >= 1);
+    const cap = AD_LIMITS.placements[pl].perRun;
+    b.disabled = left <= 0 || used >= cap || (pl === 'unlock_stop' && !game.canUnlockStop());
     b.addEventListener('click', async () => {
       $('modal-sheet').classList.add('hidden');
       const r = await meta.rewarded(pl, used);
@@ -696,6 +743,17 @@ function openAdSheet() {
   });
   $('modal-sheet').classList.remove('hidden');
 }
+async function openStopAd() {
+  if (!game || !game.canUnlockStop()) { toast('Açılacak kilitli durak kalmadı'); return; }
+  const used = game.adCounts.unlock_stop || 0;
+  if (used >= AD_LIMITS.placements.unlock_stop.perRun) { toast('Bu seviyede en fazla ' + AD_LIMITS.placements.unlock_stop.perRun + ' durak açabilirsin'); return; }
+  const r = await meta.rewarded('unlock_stop', used);
+  if (!r.ok) return;
+  applyAdReward('unlock_stop', r.reward);
+  if (game.status === 'playing') { handled = null; closeModals(); }
+  updateHud();
+}
+$('lose-stop').addEventListener('click', openStopAd);
 $('tool-ad').addEventListener('click', () => { sfx.click(); openAdSheet(); });
 $('sheet-close').addEventListener('click', () => $('modal-sheet').classList.add('hidden'));
 $('lose-retry').addEventListener('click', () => { sfx.click(); startLevel(game.L.id); });
@@ -713,8 +771,8 @@ $('tool-restart').addEventListener('click', () => { if (game) { sfx.click(); sta
 $('tool-slot').addEventListener('click', () => {
   if (!game || !game.canAddSlot()) return;
   game.addSlot(); sfx.coin();
-  view.slotMats.forEach((m, i) => (m.opacity = i < game.st.cap ? 0.75 : 0.18));
-  toast('Ek park yeri açıldı'); updateHud();
+  updateStops();
+  toast('Ek durak açıldı'); updateHud();
   if (game.status !== 'playing') enqueue(() => afterMove());
 });
 $('tool-hint').addEventListener('click', () => {
@@ -818,6 +876,8 @@ window.__lbm = {
   meta,
   analytics,
   setNow: (fn) => { clockNow = fn; },
+  lockedVisible: () => (view ? view.lockSprites.filter((x) => x.visible).length : -1),
+  stopAd: () => openStopAd(),
   fastAds: () => { meta.adSeconds = 0.3; },
 };
 

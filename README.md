@@ -5,10 +5,10 @@ Ayrıntılı durum için: [`docs/DURUM_RAPORU.md`](docs/DURUM_RAPORU.md), eksikl
 
 ## Nasıl oynanır
 1. Izgaradaki bir otobüse dokun. Üstündeki ok yönünde gidip ızgaradan çıkar. Yolunda başka otobüs varsa **hareket etmez** (hata sayılır).
-2. Çıkan otobüs **park alanına** girer. Alttaki **yolcu sırasının** başındaki yolcu, aynı renk ve simgedeki otobüse biner.
-3. Uygun otobüs yoksa yolcu **bekleme alanına** geçer. Bekleme alanı doluysa sıra bekler.
-4. Otobüs dolunca park alanından ayrılır. Tüm yolcular binince seviye biter.
-5. Hamle kalmazsa (park alanı dolup kilitlenme / hamle limiti bitmesi) seviye kaybedilir.
+2. Çıkan otobüs **durağa** girer. Alttaki **yolcu sırasının** başındaki yolcu, aynı renk ve simgedeki otobüse biner.
+3. Uygun otobüs yoksa yolcu **bekleme alanına** geçer. Ekranda 6 durak görünür; 3–4'ü açık, kalanı **kilitlidir**: kilitli 📺 durağa dokunup (isteğe bağlı) reklam izleyerek o seviyeliğine açabilirsin. Tüm seviyeler reklamsız çözülebilir. Bekleme alanı doluysa sıra bekler.
+4. Otobüs dolunca duraktan ayrılır. Tüm yolcular binince seviye biter.
+5. Hamle kalmazsa (duraklar dolup kilitlenme / hamle limiti bitmesi) seviye kaybedilir.
 
 Yıldızlar: 1★ tamamla · 2★ en çok 2 hata ve 1 ipucu · 3★ hatasız, ipuçsuz, ekstra park yeri kullanmadan.
 Yardımcılar (seviye başına): Geri al ×3, İpucu ×3 (çözücü gerçek bir sonraki hamleyi bulur), +1 park yeri ×1.

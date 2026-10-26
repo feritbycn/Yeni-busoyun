@@ -1,4 +1,4 @@
-# Bilinen sorunlar ve tamamlanmayan özellikler (v0.2)
+# Bilinen sorunlar ve tamamlanmayan özellikler (v0.3)
 
 ## YAPILMADI
 Aşağıdakiler bu sürümde **yoktur**; arayüzde çalışıyormuş gibi gösterilmez.
@@ -36,7 +36,9 @@ Aşağıdakiler bu sürümde **yoktur**; arayüzde çalışıyormuş gibi göste
 - **Saat güvenliği:** Cihaz saati geri alınırsa (>5 dk) günlük giriş/görev/reklam ödülleri verilmez; ancak saati *ileri* alarak günlük sıfırlamalar tetiklenebilir. Çevrimdışı çözümü yoktur.
 - **Test makbuzları** `localStorage`'da tutulur; "geri yükle" bunları okur. Uygulama verisi silinirse test satın alması da gider (gerçek mağazada sunucu/mağaza geri yükler).
 - **Erken kayıp tespiti yok:** Oyun yalnızca hiç hamle kalmadığında kaybı ilan eder (Geri al/İpucu ile kurtarılır).
-- **Seviye ≥ 64 çok zor olabilir** (rastgele bot %0–10 kazanır). 1–15. seviyeler çok kolay olabilir.
+- **Zorluk (v0.3'te artırıldı, insan testi YOK):** 1–3. seviyeler öğretici (4 açık durak); 4. seviyeden sonra 3 açık durak, 3 bekleme yeri, daha çok otobüs/renk. Rastgele oynayan botun kazanma oranı 4. seviyede ~%67, 30. seviyede %6, 40+ seviyelerde ~%0'dır. Tümü açık duraklarla çözülebilir kanıtlıdır, ancak insan için gerçek zorluk ölçülmedi; 40+ seviyeler fazla zor çıkabilir. 65 seviyede çözülebilirlik için bekleme/durak sayısı +1–2 gevşetildi (`metrics.relaxed`).
+- **Durak kuralı:** Yolcular yalnızca bir otobüs çıkarken bindiği için, açık duraklar doluysa oyun hemen kilitlenir (yeni hamle yok). Bu durumda "Yeni durak aç" (test reklamı) ile kurtarılabilir; geri alma da çözümdür. Dolu durakta otobüse dokunmak hata/hamle sayılmaz ve uyarı gösterir.
+- **Reklamla durak:** seviye başına en çok 3, günde 10 hak; kullanılırsa o seviyede 3 yıldız alınamaz.
 - **Debug kancası:** `window.__lbm` konsola açıktır (saat/reklam süresi değiştirebilir); mağazaya çıkmadan önce kaldırılmalıdır.
 - **Reklam çocuk politikası:** `MONETIZATION.childDirected` bayrağı yalnızca yer tutucudur; gerçek SDK'da uygulanmalıdır.
 - three.js `Clock` kullanımdan kalkma uyarısı, `PCFSoftShadowMap` uyarısı. Tek bundle ~730 KB.

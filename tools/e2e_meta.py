@@ -95,7 +95,7 @@ async def main():
         check('Üyelik bitince premium kapanır, kozmetik kalır', not await ev("window.__lbm.meta.premium()") and await ev(f"{S}.garage.owned.includes('vip_black')"))
 
         # --- oyun içi: ödüllü reklamla ipucu / park yeri, ödül ikileme, ara reklam
-        await ev("window.__lbm.start(14)"); await page.wait_for_timeout(2500)   # 14. seviyede hamle limiti
+        await ev("window.__lbm.start(18)"); await page.wait_for_timeout(2500)   # 18. seviyede hamle limiti
         await page.click('#tool-ad'); await page.wait_for_timeout(300)
         opts = await ev("document.querySelectorAll('#sheet-options button').length")
         check('Reklam seçenekleri açıldı (hamle limiti olan seviyede 3 seçenek)', opts == 3, opts)
@@ -105,10 +105,29 @@ async def main():
         await page.click('#tool-ad'); await page.click('#sheet-options button:nth-child(2)')
         await page.wait_for_selector('#ad-done:not([disabled])', timeout=5000); await page.click('#ad-done'); await page.wait_for_timeout(300)
         g = await ev("({adSlots: window.__lbm.game().adSlots, stars: window.__lbm.game().starsNow()})")
-        check('Reklamla geçici park yeri verildi ve 3★ engellendi', g['adSlots'] == 1 and g['stars'] < 3, g)
+        check('Reklamla durak açıldı ve 3★ engellendi', g['adSlots'] == 1 and g['stars'] < 3, g)
         await page.click('#tool-ad'); await page.wait_for_timeout(200)
         check('Aynı seviyede aynı reklam ödülü ikinci kez kapalı', await ev("document.querySelector('#sheet-options button:nth-child(1)').disabled"))
         await page.click('#sheet-close')
+
+        # --- kilitli duraklar ve kilitlenme kurtarma
+        await ev("window.__lbm.start(30)"); await page.wait_for_timeout(2500)
+        lv = await ev("({locked: window.__lbm.lockedVisible(), cap: window.__lbm.game().st.cap, stops: window.__lbm.game().L.stops})")
+        check('Tüm duraklar görünür; kilitli olanlar reklam simgeli', lv['locked'] == lv['stops'] - lv['cap'] and lv['locked'] >= 2, lv)
+        await ev("(window.__lbm.stopAd(), 0)"); await page.wait_for_selector('#ad-done:not([disabled])', timeout=5000); await page.click('#ad-done'); await page.wait_for_timeout(400)
+        lv2 = await ev("({locked: window.__lbm.lockedVisible(), cap: window.__lbm.game().st.cap})")
+        check('Kilitli durağa dokunma (reklam) bir durak açtı', lv2['cap'] == lv['cap'] + 1 and lv2['locked'] == lv['locked'] - 1, lv2)
+        lost = await ev("""(async () => { for (let t = 0; t < 40; t++) { window.__lbm.start(30);
+          const g = () => window.__lbm.game(); let guard = 0;
+          while (g().status === 'playing' && guard++ < 60) { const P = window.__lbm.prepare(g().L); const ids = g().L.buses.map((_, i) => i).filter((i) => !(g().st.mask & (1 << i)) && !(P.blk[i] & ~g().st.mask));
+            if (!ids.length) break; window.__lbm.tap(ids[Math.floor(Math.random() * ids.length)]); }
+          if (g().status === 'lost') return true; } return false; })()""")
+        check('Rastgele oyunla kilitlenme oluştu (test hazırlığı)', lost)
+        if lost:
+            await page.wait_for_selector('#modal-lose:not(.hidden)', timeout=15000)
+            check('Kilitlenince "Yeni durak aç" düğmesi görünür', await page.is_visible('#lose-stop'))
+            await page.click('#lose-stop'); await page.wait_for_selector('#ad-done:not([disabled])', timeout=5000); await page.click('#ad-done'); await page.wait_for_timeout(600)
+            check('Reklamla durak açılınca seviye kurtarıldı, kayıp ekranı kapandı', await ev("window.__lbm.game().status") == 'playing' and not await page.is_visible('#modal-lose'))
 
         # kazan -> ödül ikileme
         await ev("window.__lbm.start(7)"); await page.wait_for_timeout(2500)

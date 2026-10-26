@@ -227,3 +227,51 @@ test('analitik: halka tampon sınırı, hata kaydı, ağ yok', () => {
 });
 
 test('dayKey yerel tarihle çalışır', () => assert.equal(dayKey(T0), '2026-10-26'));
+
+// ---- v0.3: durak kuralları ----
+import { stopsOf } from '../src/core/engine.js';
+import { loadLevels } from './helpers.mjs';
+
+test('dolu durakta otobüs çıkmaz ve bu hata/hamle sayılmaz', () => {
+  const L = tinyLevel({ bay: 1, stops: 3, moveLimit: 5, queue: [0, 0, 1, 0, 0, 1] });
+  const g = new Game(L);
+  assert.ok(g.tap(1).ok); // durak doldu (renk 1 yolcusu tam binmedi)
+  const taps = g.taps, mist = g.mistakes, mask = g.st.mask;
+  g.status = 'playing'; // durak doluyken motor 'lost' der; tap korumasını doğrudan sına
+  const r = g.tap(2);
+  assert.equal(r.ok, false); assert.equal(r.reason, 'bay_full');
+  assert.equal(g.taps, taps); assert.equal(g.mistakes, mist); assert.equal(g.st.mask, mask);
+});
+
+test('kilitli durak reklamla açılır; kilitlenmiş seviye kurtarılır; üst sınır toplam durak', () => {
+  const L = tinyLevel({ bay: 1, stops: 3, queue: [0, 0, 1, 0, 0, 1] });
+  const g = new Game(L);
+  g.tap(1);
+  assert.equal(g.status, 'lost'); // açık durak dolu, çıkabilen yok
+  assert.equal(g.lockedStops, 2);
+  assert.ok(g.canUnlockStop());
+  assert.ok(g.grantAdSlot());
+  assert.equal(g.st.cap, 2);
+  assert.equal(g.status, 'playing'); // kurtarıldı
+  assert.ok(g.grantAdSlot());
+  assert.equal(g.grantAdSlot(), false); // toplam 3 durak
+  assert.equal(g.starsNow() < 3, true); // reklamlı durak 3★'ı engeller
+});
+
+test('tüm seviyelerde 6 durak görünür, açık durak < toplam ve reklamsız çözüm kanıtlı', async () => {
+  const { solve } = await import('../src/core/solver.js');
+  const levels = loadLevels();
+  for (const L of levels) {
+    assert.ok(stopsOf(L) > L.bay, `seviye ${L.id}: kilitli durak yok`);
+    assert.equal(L.helpers.extraSlot, 0, 'ücretsiz ek durak yardımcısı kapalı');
+    assert.ok(solve(L), `seviye ${L.id} reklamsız çözülemiyor`);
+  }
+});
+
+test('zorluk: 4+ seviyelerde açık durak 3-4, bekleme alanı <= 3, otobüs sayısı artar', () => {
+  const levels = loadLevels();
+  const avg = (a, b, f) => levels.slice(a, b).reduce((x, l) => x + f(l), 0) / (b - a);
+  assert.ok(levels.slice(3).every((l) => l.bay <= 4 && l.wait <= 3));
+  assert.ok(avg(80, 100, (l) => l.buses.length) > avg(0, 20, (l) => l.buses.length) + 6);
+  assert.ok(avg(0, 20, (l) => l.metrics.randomWinRate) < 0.85, 'ilk 20 seviye hâlâ çok kolay');
+});
