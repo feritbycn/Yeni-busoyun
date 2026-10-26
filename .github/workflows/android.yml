@@ -68,7 +68,15 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease assembleDebug bundleRelease --no-daemon --stacktrace
+          set +e
+          ./gradlew assembleRelease assembleDebug bundleRelease --no-daemon --stacktrace > "$RUNNER_TEMP/gradle.log" 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            # Hata özetini annotation olarak yaz (log indirilemese bile Actions arayüzünde/API'de görünür)
+            grep -nE "What went wrong|error:|FAILED|Caused by|Could not|not found|Unsupported" "$RUNNER_TEMP/gradle.log" | head -12 | while read -r l; do echo "::error::$(echo "$l" | cut -c1-400)"; done
+            tail -25 "$RUNNER_TEMP/gradle.log" | while read -r l; do echo "::warning::$(echo "$l" | cut -c1-300)"; done
+          fi
+          exit $code
 
       - name: Çıktıları topla
         run: |
