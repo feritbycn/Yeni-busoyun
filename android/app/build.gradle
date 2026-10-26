@@ -1,5 +1,7 @@
 apply plugin: 'com.android.application'
 
+def appVersionCode = Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
+
 android {
     namespace = "com.luxurybus.master3d"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,7 +9,7 @@ android {
         applicationId "com.luxurybus.master3d"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("VERSION_CODE") ?: "1").toInteger()
+        versionCode appVersionCode
         versionName "0.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
